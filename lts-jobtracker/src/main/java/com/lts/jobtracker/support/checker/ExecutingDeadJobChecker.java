@@ -18,10 +18,10 @@ import com.lts.core.remoting.RemotingServerDelegate;
 import com.lts.core.support.SystemClock;
 import com.lts.jobtracker.channel.ChannelWrapper;
 import com.lts.jobtracker.domain.JobTrackerAppContext;
-import com.lts.jobtracker.monitor.JobTrackerMonitor;
+import com.lts.jobtracker.monitor.JobTrackerMStatReporter;
 import com.lts.core.support.JobDomainConverter;
 import com.lts.queue.domain.JobPo;
-import com.lts.queue.exception.DuplicateJobException;
+import com.lts.store.jdbc.exception.DupEntryException;
 import com.lts.remoting.AsyncCallback;
 import com.lts.remoting.Channel;
 import com.lts.remoting.ResponseFuture;
@@ -54,11 +54,11 @@ public class ExecutingDeadJobChecker {
     private final ScheduledExecutorService FIXED_EXECUTOR_SERVICE = Executors.newScheduledThreadPool(1, new NamedThreadFactory("LTS-ExecutingJobQueue-Fix-Executor", true));
 
     private JobTrackerAppContext appContext;
-    private JobTrackerMonitor monitor;
+    private JobTrackerMStatReporter stat;
 
     public ExecutingDeadJobChecker(JobTrackerAppContext appContext) {
         this.appContext = appContext;
-        this.monitor = (JobTrackerMonitor) appContext.getMonitor();
+        this.stat = (JobTrackerMStatReporter) appContext.getMStatReporter();
     }
 
     private AtomicBoolean start = new AtomicBoolean(false);
@@ -183,7 +183,7 @@ public class ExecutingDeadJobChecker {
             // 1. add to executable queue
             try {
                 appContext.getExecutableJobQueue().add(jobPo);
-            } catch (DuplicateJobException e) {
+            } catch (DupEntryException e) {
                 LOGGER.warn("ExecutableJobQueue already exist:" + JSON.toJSONString(jobPo));
             }
 
@@ -196,7 +196,7 @@ public class ExecutingDeadJobChecker {
             jobLogPo.setLogType(LogType.FIXED_DEAD);
             appContext.getJobLogger().log(jobLogPo);
 
-            monitor.incFixExecutingJobNum();
+            stat.incFixExecutingJobNum();
 
         } catch (Throwable t) {
             LOGGER.error(t.getMessage(), t);

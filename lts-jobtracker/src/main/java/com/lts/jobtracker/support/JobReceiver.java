@@ -18,9 +18,9 @@ import com.lts.core.support.LoggerName;
 import com.lts.core.support.SystemClock;
 import com.lts.jobtracker.domain.JobTrackerAppContext;
 import com.lts.jobtracker.id.IdGenerator;
-import com.lts.jobtracker.monitor.JobTrackerMonitor;
+import com.lts.jobtracker.monitor.JobTrackerMStatReporter;
 import com.lts.queue.domain.JobPo;
-import com.lts.queue.exception.DuplicateJobException;
+import com.lts.store.jdbc.exception.DupEntryException;
 
 import java.util.Date;
 import java.util.List;
@@ -35,11 +35,11 @@ public class JobReceiver {
 
     private JobTrackerAppContext appContext;
     private IdGenerator idGenerator;
-    private JobTrackerMonitor monitor;
+    private JobTrackerMStatReporter stat;
 
     public JobReceiver(JobTrackerAppContext appContext) {
         this.appContext = appContext;
-        this.monitor = (JobTrackerMonitor) appContext.getMonitor();
+        this.stat = (JobTrackerMStatReporter) appContext.getMStatReporter();
         this.idGenerator = ServiceLoader.load(IdGenerator.class, appContext.getConfig());
     }
 
@@ -92,7 +92,7 @@ public class JobReceiver {
             success = true;
             code = BizLogCode.SUCCESS;
 
-        } catch (DuplicateJobException e) {
+        } catch (DupEntryException e) {
             // 已经存在
             if (job.isReplaceOnExist()) {
                 Assert.notNull(jobPo);
@@ -104,7 +104,7 @@ public class JobReceiver {
             }
         } finally {
             if (success) {
-                monitor.incReceiveJobNum();
+                stat.incReceiveJobNum();
             }
         }
 
@@ -117,7 +117,7 @@ public class JobReceiver {
     /**
      * 添加任务
      */
-    private void addJob(Job job, JobPo jobPo) throws DuplicateJobException {
+    private void addJob(Job job, JobPo jobPo) throws DupEntryException {
         if (job.isSchedule()) {
             addCronJob(jobPo);
             LOGGER.info("Receive Cron Job success. {}", job);
@@ -152,9 +152,9 @@ public class JobReceiver {
         // 2. 重新添加任务
         try {
             addJob(job, jobPo);
-        } catch (DuplicateJobException e) {
+        } catch (DupEntryException e) {
             // 一般不会走到这里
-            LOGGER.error("Job already exist twice. {}", job);
+            LOGGER.warn("Job already exist twice. {}", job);
             return false;
         }
         return true;
@@ -163,15 +163,18 @@ public class JobReceiver {
     /**
      * 添加Cron 任务
      */
-    private void addCronJob(JobPo jobPo) throws DuplicateJobException {
+    private void addCronJob(JobPo jobPo) throws DupEntryException {
         Date nextTriggerTime = CronExpressionUtils.getNextTriggerTime(jobPo.getCronExpression());
         if (nextTriggerTime != null) {
             // 1.add to cron job queue
             appContext.getCronJobQueue().add(jobPo);
 
-            // 2. add to executable queue
-            jobPo.setTriggerTime(nextTriggerTime.getTime());
-            appContext.getExecutableJobQueue().add(jobPo);
+            // 没有正在执行, 则添加
+            if (appContext.getExecutingJobQueue().getJob(jobPo.getTaskTrackerNodeGroup(), jobPo.getTaskId()) == null) {
+                // 2. add to executable queue
+                jobPo.setTriggerTime(nextTriggerTime.getTime());
+                appContext.getExecutableJobQueue().add(jobPo);
+            }
         }
     }
 
