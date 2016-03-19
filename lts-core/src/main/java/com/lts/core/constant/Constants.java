@@ -63,8 +63,8 @@ public interface Constants {
     int DEFAULT_REGISTRY_RECONNECT_PERIOD = 3 * 1000;
 
     // 客户端提交并发请求size
-    String JOB_SUBMIT_CONCURRENCY_SIZE = "job.submit.concurrency.size";
-    int DEFAULT_JOB_SUBMIT_CONCURRENCY_SIZE = 100;
+    String JOB_SUBMIT_MAX_QPS = "job.submit.maxQPS";
+    int DEFAULT_JOB_SUBMIT_MAX_QPS = 500;
 
     String PROCESSOR_THREAD = "job.processor.thread";
     int DEFAULT_PROCESSOR_THREAD = 32 + AVAILABLE_PROCESSOR * 5;
@@ -80,10 +80,12 @@ public interface Constants {
     String JOB_PULL_FREQUENCY = "job.pull.frequency";
     int DEFAULT_JOB_PULL_FREQUENCY = 1;
 
-    // TaskTracker 离线(网络隔离)时间 2 分钟，超过两分钟，自动停止当前执行任务
-    long TASK_TRACKER_OFFLINE_LIMIT_MILLIS = 2 * 60 * 1000;
+    // TaskTracker 离线(网络隔离)时间 10s，超过10s，自动停止当前执行任务
+    long DEFAULT_TASK_TRACKER_OFFLINE_LIMIT_MILLIS = 10 * 1000;
+    // 当TaskTracker离线超过了这个时间,那么就会进入自杀流程,停止当前所有线程
+//    String TASK_TRACKER_OFFLINE_LIMIT_MILLIS = "tasktracker.offline.limit.millis";
     // TaskTracker超过一定时间断线JobTracker，自动停止当前的所有任务
-    String TASK_TRACKER_STOP_WORKING_SWITCH = "stop.working";
+    String TASK_TRACKER_STOP_WORKING_ENABLE = "tasktracker.stop.working.enable";
 
     String ADMIN_ID_PREFIX = "LTS_admin_";
 
@@ -93,6 +95,9 @@ public interface Constants {
     String LAZY_JOB_LOGGER_MEM_SIZE = "lazy.job.logger.mem.size";
     // 延迟批量刷盘日志 检查频率
     String LAZY_JOB_LOGGER_CHECK_PERIOD = "lazy.job.logger.check.period";
+
+    String LAZY_JOB_LOGGER_BATCH_FLUSH_SIZE = "lazy.job.logger.batch.flush.size";
+    String LAZY_JOB_LOGGER_OVERFLOW_SIZE = "lazy.job.logger.overflow.size";
 
     String ADAPTIVE = "adaptive";
 
